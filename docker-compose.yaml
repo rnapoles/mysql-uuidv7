@@ -1,0 +1,51 @@
+# docker-compose.yaml for the uuidv7-enabled MySQL image.
+#
+# Usage:
+#   docker compose up -d --build
+#   docker compose exec mysql mysql -uroot -p"${MYSQL_ROOT_PASSWORD:-change-me}" -e "SELECT uuidv7();"
+#   docker compose down            # stop, keep data (named volume)
+#   docker compose down -v         # stop and wipe data
+#
+# Configuration is read from a .env file in this directory if present,
+# e.g.:
+#   MYSQL_ROOT_PASSWORD=super-secret
+#   MYSQL_DATABASE=app
+#   MYSQL_USER=app
+#   MYSQL_PASSWORD=app-secret
+#   MYSQL_PORT=3306
+#
+# Only MYSQL_ROOT_PASSWORD is required. The rest are optional: unset
+# MYSQL_DATABASE/USER/PASSWORD simply skip creating an extra schema/user
+# (see the image's own docs for the full list of recognized variables).
+
+services:
+  mysql:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        MYSQL_TAG: ${MYSQL_TAG:-8.0}
+    image: mysql-uuidv7:${MYSQL_TAG:-8.0}
+    container_name: mysql-uuidv7
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-change-me}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-app}
+      MYSQL_USER: ${MYSQL_USER:-app}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-app-secret}
+    ports:
+      - "${MYSQL_PORT:-3306}:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+      # Mount extra *.sql/*.sh here to run more first-boot init steps
+      # alongside init-uuidv7.sql, which the image already bakes in:
+      # - ./initdb:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+volumes:
+  mysql-data:
